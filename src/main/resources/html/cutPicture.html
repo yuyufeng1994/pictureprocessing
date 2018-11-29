@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>首页</title>
+    <style>
+        .picture-item {
+            float: left;
+            width: 200px;
+            height: 200px;
+            margin: 10px;
+            border: red solid 1px;
+        }
+
+        .picture-item img {
+            width: 100%;
+            height: 100%;
+        }
+
+    </style>
+</head>
+<body>
+<input type="file" id="myFile" name="file" onchange="chooseImg()">
+<div id="picture-list" style="clear: both">
+
+</div>
+
+<hr/>
+<br/>
+<div style="clear: both">
+    <canvas id="myCanvas" width="300px;" height="300px" style="border: 1px solid red">
+</div>
+</canvas>
+<br/>
+<button onclick="convertCanvasToImage()">保存</button>
+<button onclick="uploadCanvasToImage()">上传</button>
+<div id="my-bottom">
+    <input id="range" type="range" min="0" max="100" value="5" onchange="sliderChange()">
+    <span id="bottom-value">5</span>
+</div>
+
+<hr/>
+<p>X:<span id="c-x"></span></p>
+<p>Y:<span id="c-y"></span></p>
+</body>
+<script src="https://cdn.bootcss.com/jquery/3.3.1/jquery.min.js"></script>
+<script>
+
+    var imageSize = document.getElementById('range').value * 100;
+
+    var canvas = document.getElementById("myCanvas");
+    var ctx = canvas.getContext("2d");
+
+    function uploadCanvasToImage() {
+        // 图片导出为 png 格式
+        var imgData = canvas.toDataURL("image/jpeg", 1.0);
+        var blob = dataURItoBlob(imgData)
+        fnUpload(blob);
+    }
+
+
+    function dataURItoBlob(base64Data) {
+        var byteString;
+        if (base64Data.split(',')[0].indexOf('base64') >= 0)
+            byteString = atob(base64Data.split(',')[1]);
+        else
+            byteString = unescape(base64Data.split(',')[1]);
+        var mimeString = base64Data.split(',')[0].split(':')[1].split(';')[0];
+        var ia = new Uint8Array(byteString.length);
+        for (var i = 0; i < byteString.length; i++) {
+            ia[i] = byteString.charCodeAt(i);
+        }
+        return new Blob([ia], {type: mimeString});
+    };
+
+
+    function convertCanvasToImage() {
+        // 图片导出为 png 格式
+        var type = 'png';
+        var imgData = canvas.toDataURL(type);
+        // 加工image data，替换mime type
+        imgData = imgData.replace(_fixType(type), 'image/octet-stream');
+
+        // 下载后的问题名
+        var filename = 'yyf_' + (new Date()).getTime() + '.' + type;
+        // download
+        saveFile(imgData, filename);
+    }
+
+    var _fixType = function (type) {
+        type = type.toLowerCase().replace(/jpg/i, 'jpeg');
+        var r = type.match(/png|jpeg|bmp|gif/)[0];
+        return 'image/' + r;
+    };
+
+    var saveFile = function (data, filename) {
+        var save_link = document.createElementNS('http://www.w3.org/1999/xhtml', 'a');
+        save_link.href = data;
+        save_link.download = filename;
+
+        var event = document.createEvent('MouseEvents');
+        event.initMouseEvent('click', true, false, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null);
+        save_link.dispatchEvent(event);
+    };
+
+
+    function fnUpload(fileData) {
+        var formData = new FormData();
+        formData.append('file', fileData);
+        $.ajax({
+            url: "http://127.0.0.1:8080/file/upload",
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function (res) {
+                console.log(res)
+                $("#picture-list").append("<div class='picture-item'><img src='" + res + "'/></div>");
+            },
+            error: function (res) {
+                console.log(res)
+            }
+        });
+    }
+
+    var img = new Image;
+
+    function chooseImg() {
+        ctx.clearRect(0, 0, 300, 300);
+        var file = document.getElementById("myFile").files[0];
+        console.log(file)
+        var reader = new FileReader();
+        reader.readAsDataURL(file);//转化成base64数据类型
+        reader.onload = function (e) {
+            img.src = this.result;
+            img.onload = function () {//必须onload之后再画
+                document.getElementById('bottom-value').innerHTML = 5;
+                ctx.drawImage(img, 0, 0, 500, 500);
+            }
+        }
+    }
+
+    var oldBeginX = 0;
+    var oldBeginY = 0;
+    canvas.onmousedown = function (e) {
+        var beginX = e.clientX
+        var beginY = e.clientY
+
+        $("#c-x").html(oldBeginX)
+        $("#c-y").html(oldBeginY)
+
+        canvas.onmousemove = function (e) {
+            console.log(e.clientX + ' ' + e.clientY)
+            ctx.clearRect(0, 0, 300, 300);
+            ctx.drawImage(img, oldBeginX + e.clientX - beginX, oldBeginY + e.clientY - beginY, imageSize, imageSize);
+
+            $("#c-x").html(oldBeginX)
+            $("#c-y").html(oldBeginY)
+        }
+
+        canvas.onmouseup = function (e) {
+            oldBeginX = oldBeginX + e.clientX - beginX
+            oldBeginY = oldBeginY + e.clientY - beginY
+            canvas.onmousemove = null;
+            canvas.onmouseout = null;
+            $("#c-x").html(oldBeginX)
+            $("#c-y").html(oldBeginY)
+        }
+
+    }
+
+    function sliderChange() {
+        var value = document.getElementById('range').value;
+        document.getElementById('bottom-value').innerHTML = value;
+        ctx.clearRect(0, 0, 300, 300);
+        imageSize = value * 100;
+        ctx.drawImage(img, oldBeginX, oldBeginY,imageSize, imageSize);
+    }
+
+
+</script>
+</html>
